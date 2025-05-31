@@ -1,31 +1,38 @@
 import { pool } from '../config/db';
 
+export type UserRole = "user" | "admin";
+
 export interface User {
   id: string;
   username: string;
   email: string;
   password: string;
   created_at: Date;
+  role: UserRole;
 }
 
 export interface UserInput {
   username: string;
   email: string;
   password: string;
+  role?: UserRole;
 }
 
 export class UserModel {
 
   static async createUser(userData: UserInput): Promise<User> {
-    const { username, email, password } = userData;
+    const { username, email, password, role } = userData;
+
+    const userRole = role || 'user';
+
     
     const query = `
-      INSERT INTO users (username, email, password)
-      VALUES ($1, $2, $3)
+      INSERT INTO users (username, email, password, role)
+      VALUES ($1, $2, $3, $4)
       RETURNING *
     `;
     
-    const values = [username, email, password];
+    const values = [username, email, password, userRole];
     
     try {
       const result = await pool.query(query, values);
@@ -87,7 +94,7 @@ export class UserModel {
   }
 
   static async updateUser(id: string, userData: Partial<UserInput>): Promise<User | null> {
-    const { username, email, password } = userData;
+    const { username, email, password, role } = userData;
 
     const updates: string[] = [];
     const values: any[] = [];
@@ -108,6 +115,12 @@ export class UserModel {
     if (password) {
       updates.push(`password = $${paramCount}`);
       values.push(password);
+      paramCount++;
+    }
+
+    if (role){
+      updates.push(`role = $${paramCount}`);
+      values.push(role);
       paramCount++;
     }
     

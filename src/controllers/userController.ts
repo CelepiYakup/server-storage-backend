@@ -26,19 +26,23 @@ export class UserController {
       const newUser = await UserModel.createUser({
         ...userData,
         password: hashedPassword,
+        role: "user",
       });
 
       const { password, ...userWithoutPassword } = newUser;
 
       const token = jwt.sign(
-        { id: newUser.id, username: newUser.username, email: newUser.email },
+        {
+          id: newUser.id,
+          username: newUser.username,
+          email: newUser.email,
+          role: newUser.role,
+        },
         process.env.JWT_SECRET || "your_jwt_secret",
         { expiresIn: "1d" }
       );
-      
+
       await redisClient.setEx(`session:${token}`, 60, newUser.id);
-      const ttl = await redisClient.ttl(`session:${token}`);
-      console.log(ttl);
       res.status(201).json({
         message: "User registered successfully",
         user: {
@@ -88,10 +92,10 @@ export class UserController {
         { expiresIn: "1d" }
       );
 
-      const result =await redisClient.set(`session:${token}`, user.id, {
+      const result = await redisClient.set(`session:${token}`, user.id, {
         EX: 60,
       });
-      console.log('redis set sonucu',result)
+      console.log("redis set sonucu", result);
       res.status(200).json({ token, user: { id: user.id, email: user.email } });
     } catch (err) {
       res.status(500).json({ message: "Login failed", error: err });
@@ -140,7 +144,7 @@ export class UserController {
     try {
       const userId = req.params.id;
 
-      if ((userId)) {
+      if (userId) {
         res.status(400).json({ message: "Invalid user ID" });
         return;
       }
@@ -220,7 +224,7 @@ export class UserController {
     try {
       const userId = req.params.id;
 
-      if (userId) {
+      if (!userId || !/^[\w-]{36}$/.test(userId)) {
         res.status(400).json({ message: "Invalid user ID" });
         return;
       }
