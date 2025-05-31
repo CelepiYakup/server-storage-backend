@@ -1,7 +1,7 @@
 import { pool } from '../config/db';
 
 export interface User {
-  id: number;
+  id: string;
   username: string;
   email: string;
   password: string;
@@ -36,7 +36,7 @@ export class UserModel {
     }
   }
 
-  static async getUserById(id: number): Promise<User | null> {
+  static async getUserById(id: string): Promise<User | null> {
     const query = 'SELECT * FROM users WHERE id = $1';
     
     try {
@@ -86,7 +86,7 @@ export class UserModel {
     }
   }
 
-  static async updateUser(id: number, userData: Partial<UserInput>): Promise<User | null> {
+  static async updateUser(id: string, userData: Partial<UserInput>): Promise<User | null> {
     const { username, email, password } = userData;
 
     const updates: string[] = [];
@@ -133,7 +133,7 @@ export class UserModel {
   }
 
 
-  static async deleteUser(id: number): Promise<boolean> {
+  static async deleteUser(id: string): Promise<boolean> {
     const query = 'DELETE FROM users WHERE id = $1 RETURNING id';
     
     try {

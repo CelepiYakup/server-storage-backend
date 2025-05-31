@@ -1,44 +1,31 @@
 import { NextFunction, Request, Response } from "express";
-import jwt from "jsonwebtoken";
+import redisClient from "../config/redisClient";
 
 declare global {
   namespace Express {
     interface Request {
-      user?: { id: number; username: string; email: string };
+      user?: { id: string; username: string; email: string };
     }
   }
 }
 
-export const authMiddleware = (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
+export async function sessionRenewMiddleware(req: Request, res: Response, next: NextFunction) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith("Bearer ")) {
+    return res.status(401).json({ message: "No token provided" });
+  }
+  const token = authHeader.split(" ")[1];
+
   try {
-    const authHeader = req.headers.authorization;
-
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return res
-        .status(401)
-        .json({ message: "Access denied. No token provided." });
+    // Redis'teki session varsa TTL'i 60 saniyeye resetle
+    const exists = await redisClient.exists(`session:${token}`);
+    if (!exists) {
+      return res.status(401).json({ message: "Session expired or invalid" });
     }
-
-    const token = authHeader.split(" ")[1];
-
-    const decoded = jwt.verify(
-      token,
-      process.env.JWT_SECRET || "your_jwt_secret"
-    ) as {
-      id: number;
-      username: string;
-      email: string;
-    };
-
-    req.user = decoded;
+    await redisClient.expire(`session:${token}`, 60);
 
     next();
   } catch (error) {
-    console.error("Auth middleware error:", error);
-    return res.status(401).json({ message: "Invalid token. Access denied." });
+    return res.status(500).json({ message: "Server error" });
   }
-};
+}

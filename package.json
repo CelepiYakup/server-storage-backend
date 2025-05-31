@@ -20,7 +20,9 @@
     "dotenv": "^16.5.0",
     "express": "^5.1.0",
     "jsonwebtoken": "^9.0.2",
-    "pg": "^8.16.0"
+    "pg": "^8.16.0",
+    "redis": "^5.1.1",
+    "uuid4": "^2.0.3"
   },
   "devDependencies": {
     "@types/body-parser": "^1.19.5",

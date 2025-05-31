@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { UserModel, UserInput } from "../models/userModel";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import redisClient from "../config/redisClient";
 
 export class UserController {
   static async registerUser(req: Request, res: Response): Promise<void> {
@@ -11,12 +12,11 @@ export class UserController {
       const existingUserByEmail = await UserModel.getUserByEmail(
         userData.email
       );
+
       if (existingUserByEmail) {
-        res
-          .status(400)
-          .json({
-            message: "Email already registered. Please use a different email.",
-          });
+        res.status(400).json({
+          message: "Email already registered. Please use a different email.",
+        });
         return;
       }
 
@@ -35,7 +35,10 @@ export class UserController {
         process.env.JWT_SECRET || "your_jwt_secret",
         { expiresIn: "1d" }
       );
-
+      
+      await redisClient.setEx(`session:${token}`, 60, newUser.id);
+      const ttl = await redisClient.ttl(`session:${token}`);
+      console.log(ttl);
       res.status(201).json({
         message: "User registered successfully",
         user: {
@@ -48,19 +51,14 @@ export class UserController {
 
       if (error.code === "23505") {
         if (error.constraint === "users_email_key") {
-          res
-            .status(400)
-            .json({
-              message:
-                "Email already registered. Please use a different email.",
-            });
+          res.status(400).json({
+            message: "Email already registered. Please use a different email.",
+          });
         } else if (error.constraint === "users_username_key") {
-          res
-            .status(400)
-            .json({
-              message:
-                "Username already taken. Please choose a different username.",
-            });
+          res.status(400).json({
+            message:
+              "Username already taken. Please choose a different username.",
+          });
         } else {
           res
             .status(400)
@@ -69,11 +67,9 @@ export class UserController {
         return;
       }
 
-      res
-        .status(500)
-        .json({
-          message: "Server error during registration. Please try again later.",
-        });
+      res.status(500).json({
+        message: "Server error during registration. Please try again later.",
+      });
     }
   }
 
@@ -81,70 +77,78 @@ export class UserController {
   static async loginUser(req: Request, res: Response): Promise<void> {
     try {
       const { email, password } = req.body;
-
-      if (!email || !password) {
-        res.status(400).json({ message: "Email and password are required" });
-        return;
-      }
-
       const user = await UserModel.getUserByEmail(email);
-      if (!user) {
-        res.status(401).json({ message: "Invalid email or password" });
+      if (!user || !(await bcrypt.compare(password, user.password))) {
+        res.status(401).json({ message: "Invalid credentials" });
         return;
       }
-
-      const isPasswordValid = await bcrypt.compare(password, user.password);
-      if (!isPasswordValid) {
-        res.status(401).json({ message: "Invalid email or password" });
-        return;
-      }
-
       const token = jwt.sign(
         { id: user.id, username: user.username, email: user.email },
-        process.env.JWT_SECRET || "your_jwt_secret",
+        process.env.JWT_SECRET!,
         { expiresIn: "1d" }
       );
 
-      const { password: _, ...userWithoutPassword } = user;
-
-      res.status(200).json({
-        message: "Login successful",
-        user: {
-          ...userWithoutPassword,
-          token,
-        },
+      const result =await redisClient.set(`session:${token}`, user.id, {
+        EX: 60,
       });
-    } catch (error) {
-      console.error("Error logging in:", error);
-      res.status(500).json({ message: "Server error" });
+      console.log('redis set sonucu',result)
+      res.status(200).json({ token, user: { id: user.id, email: user.email } });
+    } catch (err) {
+      res.status(500).json({ message: "Login failed", error: err });
+    }
+  }
+
+  //logout user
+  static async logoutUser(req: Request, res: Response): Promise<void> {
+    const token = req.headers.authorization?.split(" ")[1];
+    if (!token) {
+      res.status(400).json({ message: "No token provided" });
+      return;
+    }
+
+    try {
+      await redisClient.del(`session:${token}`);
+      res.status(200).json({ message: "Logged out successfully" });
+    } catch (err) {
+      res.status(500).json({ message: "Logout failed" });
     }
   }
 
   static async getAllUsers(req: Request, res: Response): Promise<void> {
     try {
+      const cacheKey = "users:all";
+      const cached = await redisClient.get(cacheKey);
+
+      if (cached) {
+        res.status(200).json(JSON.parse(cached));
+        return;
+      }
+
       const users = await UserModel.getAllUsers();
+
+      await redisClient.set(cacheKey, JSON.stringify(users), {
+        EX: 60, // 5 dakika
+      });
+
       res.status(200).json(users);
-    } catch (error) {
-      console.error("Error getting all users:", error);
-      res.status(500).json({ message: "Server error" });
+    } catch (err) {
+      res.status(500).json({ message: "Fetching users failed", error: err });
     }
   }
 
   static async getUserById(req: Request, res: Response): Promise<void> {
     try {
-      const userId = parseInt(req.params.id);
+      const userId = req.params.id;
 
-      if (isNaN(userId)) {
+      if ((userId)) {
         res.status(400).json({ message: "Invalid user ID" });
         return;
       }
 
-      if (req.user && req.user.id !== userId) {
-        res
-          .status(403)
-          .json({
-            message: "Access denied. You can only view your own account.",
-          });
+      if (req.user && req.user?.id !== userId) {
+        res.status(403).json({
+          message: "Access denied. You can only view your own account.",
+        });
         return;
       }
 
@@ -167,20 +171,18 @@ export class UserController {
   // Update user
   static async updateUser(req: Request, res: Response): Promise<void> {
     try {
-      const userId = parseInt(req.params.id);
+      const userId = req.params.id;
       const userData: Partial<UserInput> = req.body;
 
-      if (isNaN(userId)) {
+      if (userId) {
         res.status(400).json({ message: "Geçersiz kullanıcı ID" });
         return;
       }
 
-      if (req.user && req.user.id !== userId) {
-        res
-          .status(403)
-          .json({
-            message: "Access denied. You can only update your own account.",
-          });
+      if (req.user && req.user?.id !== userId) {
+        res.status(403).json({
+          message: "Access denied. You can only update your own account.",
+        });
         return;
       }
 
@@ -216,19 +218,17 @@ export class UserController {
 
   static async deleteUser(req: Request, res: Response): Promise<void> {
     try {
-      const userId = parseInt(req.params.id);
+      const userId = req.params.id;
 
-      if (isNaN(userId)) {
+      if (userId) {
         res.status(400).json({ message: "Invalid user ID" });
         return;
       }
 
-      if (req.user && req.user.id !== userId) {
-        res
-          .status(403)
-          .json({
-            message: "Access denied. You can only delete your own account.",
-          });
+      if (req.user && req.user?.id !== userId) {
+        res.status(403).json({
+          message: "Access denied. You can only delete your own account.",
+        });
         return;
       }
 
