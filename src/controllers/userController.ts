@@ -120,7 +120,7 @@ export class UserController {
       const result = await redisClient.set(`session:${token}`, user.id, {
         EX: 60,
       });
-      console.log("redis set sonucu", result);
+      console.log("redis set", result);
       res.status(200).json({ token, user: { id: user.id, email: user.email } });
     } catch (err) {
       res.status(500).json({ message: "Login failed", error: err });
