@@ -1,4 +1,3 @@
-// src/services/queueService.ts - TypeScript error düzeltilmiş
 import Queue from "bull";
 
 export const emailQueue = new Queue("email processing", {
@@ -15,16 +14,16 @@ export const fileProcessingQueue = new Queue("file processing", {
   },
 });
 
-// Email worker - welcome email işleme
 emailQueue.process("welcome-email", async (job) => {
   const { email, username, userId } = job.data;
 
   console.log(`📧 Processing welcome email for ${email} (User: ${username})`);
 
-  // Email sending simulation (gerçekte SendGrid, Nodemailer vs. kullanırız)
   await new Promise((resolve) => setTimeout(resolve, 2000));
 
-  console.log(`✅ Welcome email sent to ${email} for user ${username} (ID: ${userId})`);
+  console.log(
+    ` Welcome email sent to ${email} for user ${username} (ID: ${userId})`
+  );
 
   return {
     status: "sent",
@@ -35,16 +34,16 @@ emailQueue.process("welcome-email", async (job) => {
   };
 });
 
-// File worker - dosya yükleme işleme
 fileProcessingQueue.process("file-upload", async (job) => {
   const { fileName, userId, fileSize, fileType } = job.data;
 
-  console.log(`📄 Processing file upload for user ${userId}: ${fileName} (${fileSize} bytes)`);
+  console.log(
+    `📄 Processing file upload for user ${userId}: ${fileName} (${fileSize} bytes)`
+  );
 
-  // File processing simulation
   await new Promise((resolve) => setTimeout(resolve, 3000));
 
-  console.log(`✅ File ${fileName} uploaded successfully for user ${userId}`);
+  console.log(` File ${fileName} uploaded successfully for user ${userId}`);
 
   return {
     status: "processed",
@@ -56,43 +55,40 @@ fileProcessingQueue.process("file-upload", async (job) => {
   };
 });
 
-// Queue event handlers
 emailQueue.on("completed", (job, result) => {
-  console.log(`📧 Email job ${job.id} completed:`, {
+  console.log(` Email job ${job.id} completed:`, {
     recipient: result.recipient,
     status: result.status,
-    completedAt: result.timestamp
+    completedAt: result.timestamp,
   });
 });
 
 emailQueue.on("failed", (job, err) => {
-  console.error(`❌ Email job ${job.id} failed:`, err.message);
+  console.error(` Email job ${job.id} failed:`, err.message);
 });
 
 emailQueue.on("active", (job) => {
-  console.log(`⚡ Email job ${job.id} started processing for ${job.data.email}`);
+  console.log(` Email job ${job.id} started processing for ${job.data.email}`);
 });
 
 fileProcessingQueue.on("completed", (job, result) => {
-  console.log(`📄 File processing job ${job.id} completed:`, {
+  console.log(` File processing job ${job.id} completed:`, {
     fileName: result.fileName,
     status: result.status,
-    completedAt: result.timestamp
+    completedAt: result.timestamp,
   });
 });
 
 fileProcessingQueue.on("failed", (job, err) => {
-  console.error(`❌ File processing job ${job.id} failed:`, err.message);
+  console.error(` File processing job ${job.id} failed:`, err.message);
 });
 
 fileProcessingQueue.on("active", (job) => {
-  console.log(`⚡ File job ${job.id} started processing: ${job.data.fileName}`);
+  console.log(` File job ${job.id} started processing: ${job.data.fileName}`);
 });
 
-// Queue istatistikleri fonksiyonu
 export const getQueueStats = async () => {
   try {
-    // Email queue stats
     const emailStats = {
       waiting: await emailQueue.getWaiting(),
       active: await emailQueue.getActive(),
@@ -100,7 +96,6 @@ export const getQueueStats = async () => {
       failed: await emailQueue.getFailed(),
     };
 
-    // File queue stats
     const fileStats = {
       waiting: await fileProcessingQueue.getWaiting(),
       active: await fileProcessingQueue.getActive(),
@@ -122,26 +117,22 @@ export const getQueueStats = async () => {
         failed: fileStats.failed.length,
       },
     };
-
-    console.log("📊 Queue stats generated:", stats);
+    console.log(" Queue stats generated:", stats);
     return stats;
-    
   } catch (error) {
-    console.error("❌ Error getting queue stats:", error);
+    console.error(" Error getting queue stats:", error);
     throw error;
   }
 };
 
-// Kullanıcı email durumunu kontrol et - TypeScript error fix
 export const getUserEmailStatus = async (userId: string) => {
   try {
     const completedJobs = await emailQueue.getCompleted();
-    
-    const userEmailJob = completedJobs.find(job => 
-      job.data.userId === userId
+
+    const userEmailJob = completedJobs.find(
+      (job) => job.data.userId === userId
     );
 
-    // TypeScript error fix: finishedOn/processedOn undefined olabilir
     let emailSentAt: string | null = null;
     if (userEmailJob) {
       const timestamp = userEmailJob.finishedOn || userEmailJob.processedOn;
@@ -153,20 +144,17 @@ export const getUserEmailStatus = async (userId: string) => {
     return {
       emailSent: !!userEmailJob,
       emailSentAt,
-      jobId: userEmailJob?.id || null
+      jobId: userEmailJob?.id || null,
     };
-    
   } catch (error) {
-    console.error("❌ Error checking user email status:", error);
+    console.error(" Error checking user email status:", error);
     return {
       emailSent: false,
       emailSentAt: null,
-      jobId: null
+      jobId: null,
     };
   }
 };
-
-// File job ekle helper
 export const addFileJob = async (fileData: {
   fileName: string;
   userId: string;
@@ -183,11 +171,10 @@ export const addFileJob = async (fileData: {
       },
     });
 
-    console.log(`📄 File job added: ${fileData.fileName}, Job ID: ${job.id}`);
+    console.log(` File job added: ${fileData.fileName}, Job ID: ${job.id}`);
     return job;
-    
   } catch (error) {
-    console.error("❌ Error adding file job:", error);
+    console.error(" Error adding file job:", error);
     throw error;
   }
 };

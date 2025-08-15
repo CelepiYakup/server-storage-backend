@@ -156,7 +156,7 @@ export class UserController {
       const users = await UserModel.getAllUsers();
 
       await redisClient.set(cacheKey, JSON.stringify(users), {
-        EX: 60, // 5 dakika
+        EX: 60, 
       });
 
       res.status(200).json(users);

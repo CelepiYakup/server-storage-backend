@@ -1,4 +1,4 @@
-// src/routes/queueRoutes.ts - Tüm TypeScript error'ları düzeltilmiş
+
 import express, { Request, Response } from "express";
 import { getQueueStats, emailQueue } from "../services/queueService";
 
@@ -6,7 +6,6 @@ const router = express.Router();
 
 router.get("/stats", async (req: Request, res: Response): Promise<void> => {
   try {
-    console.log("📊 Fetching real queue statistics...");
     const stats = await getQueueStats();
     console.log("Queue stats:", stats);
     res.status(200).json(stats);
@@ -20,18 +19,14 @@ router.get("/email-status/:userId", async (req: Request, res: Response): Promise
   try {
     const { userId } = req.params;
     console.log(`📧 Checking real email status for user: ${userId}`);
-
-    // Completed jobs'da bu user'ın email'ini ara
     const completedJobs = await emailQueue.getCompleted();
     
-    // User'ın welcome email job'unu bul
     const userEmailJob = completedJobs.find(job => 
       job.data.userId === userId && job.data.email
     );
 
     const emailSent = !!userEmailJob;
-    
-    // TypeScript error fix: finishedOn undefined olabilir
+  
     let emailSentAt: string | null = null;
     if (userEmailJob) {
       const timestamp = userEmailJob.finishedOn || userEmailJob.processedOn;
@@ -55,7 +50,7 @@ router.get("/email-status/:userId", async (req: Request, res: Response): Promise
   }
 });
 
-// TypeScript error fix: Promise<void> return type ve explicit return
+
 router.post("/test-email", async (req: Request, res: Response): Promise<void> => {
   try {
     const { email, username, userId } = req.body;
@@ -64,7 +59,7 @@ router.post("/test-email", async (req: Request, res: Response): Promise<void> =>
       res.status(400).json({ 
         message: "Missing required fields: email, username, userId" 
       });
-      return; // Explicit return eklendi
+      return;
     }
 
     console.log(`🧪 Adding test email job for ${email}`);
@@ -109,7 +104,6 @@ router.get("/health", async (req: Request, res: Response): Promise<void> => {
       stats
     });
   } catch (error: unknown) {
-    // TypeScript error fix: error'ın type'ını belirt
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     console.error("Queue health check failed:", error);
     res.status(500).json({
