@@ -17,7 +17,6 @@ export async function sessionRenewMiddleware(req: Request, res: Response, next: 
   const token = authHeader.split(" ")[1];
 
   try {
-    // Redis'teki session varsa TTL'i 60 saniyeye resetle
     const exists = await redisClient.exists(`session:${token}`);
     if (!exists) {
       return res.status(401).json({ message: "Session expired or invalid" });

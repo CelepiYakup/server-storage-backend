@@ -4,7 +4,7 @@ import cors from "cors";
 import bodyParser from "body-parser";
 import userRoutes from "./routes/userRoutes";
 import { pool, initializeDatabase } from "./config/db";
-
+import queRoute from "./routes/queRoutes";
 
 dotenv.config();
 
@@ -15,7 +15,7 @@ app.use(cors());
 app.use(bodyParser.json());
 
 app.use("/api/users", userRoutes);
-
+app.use("/api/queue", queRoute);
 
 const waitForPostgres = async (retries = 10, delayMs = 3000) => {
   for (let i = 0; i < retries; i++) {
@@ -30,7 +30,7 @@ const waitForPostgres = async (retries = 10, delayMs = 3000) => {
       await new Promise((res) => setTimeout(res, delayMs));
     }
   }
-  throw new Error("❌ PostgreSQL did not become ready in time");
+  throw new Error(" PostgreSQL did not become ready in time");
 };
 
 const startServer = async () => {
@@ -43,7 +43,6 @@ const startServer = async () => {
 
     await initializeDatabase();
     console.log("Database schema initialized");
-
 
     app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);

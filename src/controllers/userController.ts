@@ -3,6 +3,7 @@ import { UserModel, UserInput } from "../models/userModel";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import redisClient from "../config/redisClient";
+import { emailQueue } from "../services/queueService";
 
 export class UserController {
   static async registerUser(req: Request, res: Response): Promise<void> {
@@ -43,6 +44,30 @@ export class UserController {
       );
 
       await redisClient.setEx(`session:${token}`, 60, newUser.id);
+
+      try {
+        await emailQueue.add(
+          "welcome-email",
+          {
+            email: newUser.email,
+            username: newUser.username,
+            userId: newUser.id,
+          },
+          {
+            delay: 1000,
+            attempts: 3,
+            backoff: {
+              type: "exponential",
+              delay: 1000,
+            },
+          }
+        );
+
+        console.log(`"Welcome email queued for user:", ${newUser.email}`);
+      } catch (queueError) {
+        console.error("Error queuing welcome email:", queueError);
+      }
+
       res.status(201).json({
         message: "User registered successfully",
         user: {
@@ -144,7 +169,7 @@ export class UserController {
     try {
       const userId = req.params.id;
 
-      if (userId) {
+      if (!userId) {
         res.status(400).json({ message: "Invalid user ID" });
         return;
       }
@@ -178,8 +203,8 @@ export class UserController {
       const userId = req.params.id;
       const userData: Partial<UserInput> = req.body;
 
-      if (userId) {
-        res.status(400).json({ message: "Geçersiz kullanıcı ID" });
+      if (!userId) {
+        res.status(400).json({ message: "Invalid user ID" });
         return;
       }
 
@@ -204,7 +229,7 @@ export class UserController {
       const updatedUser = await UserModel.updateUser(userId, userData);
 
       if (!updatedUser) {
-        res.status(400).json({ message: "Güncellenecek alan bulunamadı" });
+        res.status(400).json({ message: "User update failed" });
         return;
       }
 
